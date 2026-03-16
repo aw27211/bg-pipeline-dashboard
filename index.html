@@ -158,7 +158,7 @@
 <header>
   <div>
     <h1>BG Pipeline Dashboard</h1>
-    <div class="subtitle">Sales Pipeline · Live Data</div>
+    <div class="subtitle">Sales Pipeline · Live Data · All values in GBP</div>
   </div>
   <div id="lastUpdated">Loading…</div>
 </header>
@@ -307,20 +307,50 @@
   }
 
   // ── Aggregate helper ──────────────────────────────────────
-  function groupBy(deals, key, valueKey) {
+  function feeGBP(deal) {
+    return toGBP(deal['Fee Income'], deal['Currency']);
+  }
+
+  function groupBy(deals, key) {
     const map = {};
     deals.forEach(d => {
       const k = (d[key] || 'Unknown').toString().trim();
-      map[k] = (map[k] || 0) + (Number(d[valueKey]) || 0);
+      map[k] = (map[k] || 0) + feeGBP(d);
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }
+
+  // ── FX Rates (base GBP) ───────────────────────────────────
+  let FX_RATES = {}; // e.g. { USD: 1.27, EUR: 1.17 } — how many of X per 1 GBP
+
+  async function fetchFxRates() {
+    try {
+      const res  = await fetch('https://api.frankfurter.app/latest?base=GBP');
+      const data = await res.json();
+      FX_RATES = data.rates || {};
+    } catch (e) {
+      console.warn('FX rates unavailable, using raw values:', e.message);
+    }
+  }
+
+  // Convert any amount to GBP
+  function toGBP(amount, currency) {
+    const val = Number(amount);
+    if (!val || isNaN(val)) return 0;
+    if (!currency || currency === 'GBP') return val;
+    const rate = FX_RATES[currency.toUpperCase()];
+    if (!rate) return val; // unknown currency — use as-is
+    return val / rate;
   }
 
   // ── Main ──────────────────────────────────────────────────
   async function init() {
     try {
-      const res  = await fetch(API_URL);
-      const data = await res.json();
+      const [dealsRes] = await Promise.all([
+        fetch(API_URL),
+        fetchFxRates(),
+      ]);
+      const data = await dealsRes.json();
       if (data.error) throw new Error(data.error);
       render(data.deals || []);
       document.getElementById('lastUpdated').textContent =
@@ -359,10 +389,9 @@
       return y === 2026;
     });
 
-    // KPIs
-    const totalFee    = pipeline.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
-    const weightedFee = pipeline.reduce((s, d) =>
-      s + (Number(d['Fee Income']) || 0) * weight(d['Deal Stage']), 0);
+    // KPIs — all values converted to GBP
+    const totalFee    = pipeline.reduce((s, d) => s + feeGBP(d), 0);
+    const weightedFee = pipeline.reduce((s, d) => s + feeGBP(d) * weight(d['Deal Stage']), 0);
     const winDenom    = won2026.length + lost2026.length;
     const winRate     = winDenom > 0 ? Math.round(won2026.length / winDenom * 100) : null;
 
@@ -373,14 +402,14 @@
     document.getElementById('kpiWinRateSub').textContent  = `${won2026.length} won · ${lost2026.length} lost · ${pulled2026.length} pulled`;
     document.getElementById('kpiActive').textContent      = pipeline.length;
     document.getElementById('kpiActiveSub').textContent   = `${deals.length} total deals in CRM`;
-    const pulledFee = pulled2026.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
+    const pulledFee = pulled2026.reduce((s, d) => s + feeGBP(d), 0);
     document.getElementById('kpiPulled').textContent      = pulled2026.length;
     document.getElementById('kpiPulledSub').textContent   = `${fmt(pulledFee)} fee income foregone`;
 
     // Chart: fee income by stage
     const stageRows = STAGE_ORDER.map(s => {
       const ds  = pipeline.filter(d => d['Deal Stage'] === s);
-      const fee = ds.reduce((sum, d) => sum + (Number(d['Fee Income']) || 0), 0);
+      const fee = ds.reduce((sum, d) => sum + feeGBP(d), 0);
       return { s, fee, wfee: fee * weight(s) };
     }).filter(r => r.fee > 0);
 
@@ -404,7 +433,7 @@
     });
 
     // Chart: doughnut by project type
-    const typeRows = groupBy(pipeline, 'Project Type', 'Fee Income');
+    const typeRows = groupBy(pipeline, 'Project Type');
     new Chart(document.getElementById('chartType'), {
       type: 'doughnut',
       data: {
@@ -425,7 +454,7 @@
     });
 
     // Chart: horizontal bar by industry (top 10)
-    const indRows = groupBy(pipeline, 'Project Industry', 'Fee Income').slice(0, 10);
+    const indRows = groupBy(pipeline, 'Project Industry').slice(0, 10);
     new Chart(document.getElementById('chartIndustry'), {
       type: 'bar',
       data: {
@@ -447,7 +476,7 @@
     });
 
     // Office split bars
-    const officeRows  = groupBy(pipeline, 'Office Involved', 'Fee Income');
+    const officeRows  = groupBy(pipeline, 'Office Involved');
     const officeTotal = officeRows.reduce((s, r) => s + r[1], 0);
     document.getElementById('officeBars').innerHTML = officeRows.map(([name, val]) => {
       const pct   = officeTotal > 0 ? Math.round(val / officeTotal * 100) : 0;
@@ -470,7 +499,7 @@
     );
     document.getElementById('tableCount').textContent = sorted.length + ' deals';
     document.getElementById('tableBody').innerHTML = sorted.map(d => {
-      const fee      = Number(d['Fee Income']) || 0;
+      const fee      = feeGBP(d);
       const weighted = fee * weight(d['Deal Stage']);
       return `
         <tr>
