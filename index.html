@@ -268,6 +268,10 @@
   const PIPELINE_STAGES = new Set(['Brief', 'P2', 'P1', '90% likely']);
   const STAGE_ORDER     = ['Brief', 'P2', 'P1', '90% likely'];
 
+  // Win/loss stage names (post correct mapping)
+  const WON_STAGES  = new Set(['LIVE', 'Project Wrap up', 'Closed Won']);
+  const LOST_STAGES = new Set(['Lost']);
+
   const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#dc2626',
                    '#0891b2','#be185d','#78716c','#059669','#ea580c'];
 
@@ -342,11 +346,11 @@
       return isNaN(y) ? null : y;
     }
     const won2026    = deals.filter(d =>
-      ['LIVE', 'Project Wrap up', 'Won'].includes(d['Deal Stage']) &&
+      WON_STAGES.has(d['Deal Stage']) &&
       getYear(d['Date Entered LIVE']) === 2026
     );
     const lost2026   = deals.filter(d =>
-      d['Deal Stage'] === 'Lost' &&
+      LOST_STAGES.has(d['Deal Stage']) &&
       getYear(d['Date Entered Lost']) === 2026
     );
     const pulled2026 = deals.filter(d => {
