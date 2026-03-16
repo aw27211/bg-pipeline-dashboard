@@ -48,7 +48,7 @@
     /* KPI Cards */
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 1rem;
       margin-bottom: 1.25rem;
     }
@@ -147,6 +147,7 @@
 
     @media (max-width: 900px) {
       .kpi-grid    { grid-template-columns: repeat(2, 1fr); }
+      .kpi-card { border-left-width: 3px; }
       .charts-grid { grid-template-columns: 1fr; }
       main { padding: 1rem; }
     }
@@ -193,6 +194,11 @@
         <div class="kpi-label">Pipeline Deals</div>
         <div class="kpi-value" id="kpiActive">—</div>
         <div class="kpi-sub"  id="kpiActiveSub"></div>
+      </div>
+      <div class="kpi-card" style="border-color:#64748b">
+        <div class="kpi-label">Pulled 2026</div>
+        <div class="kpi-value" id="kpiPulled">—</div>
+        <div class="kpi-sub"  id="kpiPulledSub"></div>
       </div>
     </div>
 
@@ -337,8 +343,11 @@
       const year = new Date(raw).getFullYear();
       return year === 2026;
     }
-    const won2026  = deals.filter(d => /won/i.test(d['Deal Stage']  || '') && is2026(d));
-    const lost2026 = deals.filter(d => /lost/i.test(d['Deal Stage'] || '') && is2026(d));
+    const WON_STAGES  = new Set(['LIVE', 'Project Wrap up', 'Won']);
+    const LOST_STAGES = new Set(['Lost']);
+    const won2026    = deals.filter(d => WON_STAGES.has(d['Deal Stage'])  && is2026(d));
+    const lost2026   = deals.filter(d => LOST_STAGES.has(d['Deal Stage']) && is2026(d));
+    const pulled2026 = deals.filter(d => d['Deal Stage'] === 'Pulled'     && is2026(d));
 
     // KPIs
     const totalFee    = pipeline.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
@@ -351,9 +360,12 @@
     document.getElementById('kpiPipelineSub').textContent = `${pipeline.length} deals · Brief, P2, P1, 90%`;
     document.getElementById('kpiWeighted').textContent    = fmt(weightedFee);
     document.getElementById('kpiWinRate').textContent     = winRate != null ? winRate + '%' : 'N/A';
-    document.getElementById('kpiWinRateSub').textContent  = `2026: ${won2026.length} won · ${lost2026.length} lost`;
+    document.getElementById('kpiWinRateSub').textContent  = `${won2026.length} won · ${lost2026.length} lost · ${pulled2026.length} pulled`;
     document.getElementById('kpiActive').textContent      = pipeline.length;
     document.getElementById('kpiActiveSub').textContent   = `${deals.length} total deals in CRM`;
+    const pulledFee = pulled2026.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
+    document.getElementById('kpiPulled').textContent      = pulled2026.length;
+    document.getElementById('kpiPulledSub').textContent   = `${fmt(pulledFee)} fee income foregone`;
 
     // Chart: fee income by stage
     const stageRows = STAGE_ORDER.map(s => {
