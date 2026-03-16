@@ -330,11 +330,15 @@
     // Pipeline = Brief, P2, P1, 90% likely only (LIVE excluded)
     const pipeline = deals.filter(d => PIPELINE_STAGES.has(d['Deal Stage']));
 
-    // 2026 win rate only
-    const won2026  = deals.filter(d => /won/i.test(d['Deal Stage'] || '') &&
-      (d['Close Date'] || '').startsWith('2026'));
-    const lost2026 = deals.filter(d => /lost/i.test(d['Deal Stage'] || '') &&
-      (d['Close Date'] || '').startsWith('2026'));
+    // 2026 win rate only — handle Close Date as either a string or Date object
+    function is2026(d) {
+      const raw = d['Close Date'];
+      if (!raw) return false;
+      const year = new Date(raw).getFullYear();
+      return year === 2026;
+    }
+    const won2026  = deals.filter(d => /won/i.test(d['Deal Stage']  || '') && is2026(d));
+    const lost2026 = deals.filter(d => /lost/i.test(d['Deal Stage'] || '') && is2026(d));
 
     // KPIs
     const totalFee    = pipeline.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
