@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BG Pipeline Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    header .subtitle { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
+    #lastUpdated { font-size: 0.75rem; color: #64748b; }
+
+    main { padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; }
+
+    /* Loading / Error */
+    .loading { text-align: center; padding: 5rem; color: #64748b; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box {
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 8px; padding: 1.5rem; color: #dc2626;
+      margin: 2rem 0;
+    }
+
+    /* KPI Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .kpi-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      border-left: 4px solid transparent;
+    }
+    .kpi-card.blue   { border-color: #2563eb; }
+    .kpi-card.green  { border-color: #16a34a; }
+    .kpi-card.amber  { border-color: #d97706; }
+    .kpi-card.purple { border-color: #7c3aed; }
+    .kpi-label {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #94a3b8; margin-bottom: 0.5rem;
+    }
+    .kpi-value { font-size: 1.8rem; font-weight: 700; color: #0f172a; line-height: 1; }
+    .kpi-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 0.3rem; }
+
+    /* Charts grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .card-title {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #94a3b8; margin-bottom: 1rem;
+    }
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* Office bars */
+    .office-bars { display: flex; flex-direction: column; gap: 1.1rem; padding-top: 0.25rem; }
+    .office-label-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.85rem; margin-bottom: 0.35rem;
+    }
+    .office-name  { font-weight: 600; color: #374151; }
+    .office-meta  { color: #94a3b8; }
+    .bar-track    { background: #f1f5f9; border-radius: 4px; height: 9px; overflow: hidden; }
+    .bar-fill     { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+    /* Table */
+    .table-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      margin-bottom: 1.5rem;
+    }
+    .table-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 1rem;
+    }
+    .table-count { font-size: 0.78rem; color: #94a3b8; }
+    .table-wrap  { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
+    thead th {
+      text-align: left; padding: 0.6rem 0.75rem;
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: #94a3b8; border-bottom: 2px solid #f1f5f9;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid #f8fafc; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    tbody td { padding: 0.7rem 0.75rem; color: #374151; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { color: #94a3b8; }
+
+    /* Stage badges */
+    .badge {
+      display: inline-block; padding: 0.2rem 0.55rem;
+      border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+    }
+    .badge-emerging { background:#f0f9ff; color:#0369a1; }
+    .badge-brief    { background:#eff6ff; color:#1d4ed8; }
+    .badge-p2       { background:#f0fdf4; color:#15803d; }
+    .badge-p1       { background:#fefce8; color:#854d0e; }
+    .badge-90       { background:#fff7ed; color:#c2410c; }
+    .badge-live     { background:#dcfce7; color:#166534; }
+    .badge-default  { background:#f1f5f9; color:#64748b; }
+
+    @media (max-width: 900px) {
+      .kpi-grid    { grid-template-columns: repeat(2, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
+      main { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BG Pipeline Dashboard</h1>
+    <div class="subtitle">Sales Pipeline · Live Data</div>
+  </div>
+  <div id="lastUpdated">Loading…</div>
+</header>
+
+<main>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Fetching pipeline data…</p>
+  </div>
+
+  <div id="errorBox" class="error-box" style="display:none"></div>
+
+  <div id="dashboard" style="display:none">
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Full Pipeline Value</div>
+        <div class="kpi-value" id="kpiPipeline">—</div>
+        <div class="kpi-sub"  id="kpiPipelineSub"></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Weighted Fee Income</div>
+        <div class="kpi-value" id="kpiWeighted">—</div>
+        <div class="kpi-sub">Probability adjusted</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">Win Rate</div>
+        <div class="kpi-value" id="kpiWinRate">—</div>
+        <div class="kpi-sub"  id="kpiWinRateSub"></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Active Deals</div>
+        <div class="kpi-value" id="kpiActive">—</div>
+        <div class="kpi-sub"  id="kpiActiveSub"></div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="card-title">Fee Income by Stage</div>
+        <div class="chart-wrap"><canvas id="chartStage"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-title">Pipeline by Project Type</div>
+        <div class="chart-wrap"><canvas id="chartType"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-title">Pipeline by Industry</div>
+        <div class="chart-wrap"><canvas id="chartIndustry"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-title">Office Split</div>
+        <div class="office-bars" id="officeBars"></div>
+      </div>
+
+    </div>
+
+    <!-- Deals table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="card-title" style="margin:0">Active Deals</div>
+        <div class="table-count" id="tableCount"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Deal Name</th>
+              <th>Client</th>
+              <th>Owner</th>
+              <th>Stage</th>
+              <th>Project Type</th>
+              <th class="num">Fee Income</th>
+              <th class="num">Weighted</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</main>
+
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyOSBljdZe8_SSx5MmQyiaMrsV9pJ93EzYTdxaww6wws-dTaLFa-tsMIY33PbsQjCVhjQ/exec';
+
+  const STAGE_WEIGHTS = {
+    'Emerging Opportunity': 0.05,
+    'Brief':                0.10,
+    'P2':                   0.50,
+    'P1':                   0.80,
+    '90% likely':           0.90,
+    'LIVE':                 1.00,
+  };
+
+  const STAGE_ORDER  = ['Emerging Opportunity', 'Brief', 'P2', 'P1', '90% likely', 'LIVE'];
+  const ACTIVE_STAGES = new Set(STAGE_ORDER);
+
+  const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#dc2626',
+                   '#0891b2','#be185d','#78716c','#059669','#ea580c'];
+
+  const OFFICE_COLORS = { 'US': '#2563eb', 'Global': '#7c3aed', 'LatAm': '#16a34a' };
+
+  // ── Formatters ────────────────────────────────────────────
+  function fmt(n) {
+    const v = Number(n);
+    if (!n || isNaN(v)) return '—';
+    if (v >= 1_000_000) return '£' + (v / 1_000_000).toFixed(1) + 'm';
+    if (v >= 1_000)     return '£' + (v / 1_000).toFixed(0) + 'k';
+    return '£' + v.toFixed(0);
+  }
+
+  function fmtFull(n) {
+    const v = Number(n);
+    if (!n || isNaN(v) || v === 0) return '—';
+    return '£' + v.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+  }
+
+  function weight(stage) { return STAGE_WEIGHTS[stage] ?? 0; }
+
+  function badge(stage) {
+    const map = {
+      'Emerging Opportunity': 'badge-emerging',
+      'Brief':                'badge-brief',
+      'P2':                   'badge-p2',
+      'P1':                   'badge-p1',
+      '90% likely':           'badge-90',
+      'LIVE':                 'badge-live',
+    };
+    return `<span class="badge ${map[stage] || 'badge-default'}">${stage || '—'}</span>`;
+  }
+
+  // ── Aggregate helper ──────────────────────────────────────
+  function groupBy(deals, key, valueKey) {
+    const map = {};
+    deals.forEach(d => {
+      const k = (d[key] || 'Unknown').toString().trim();
+      map[k] = (map[k] || 0) + (Number(d[valueKey]) || 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }
+
+  // ── Main ──────────────────────────────────────────────────
+  async function init() {
+    try {
+      const res  = await fetch(API_URL);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      render(data.deals || []);
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      const el = document.getElementById('errorBox');
+      el.style.display = 'block';
+      el.textContent   = 'Could not load data: ' + err.message;
+    }
+  }
+
+  function render(deals) {
+    document.getElementById('loading').style.display   = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+
+    const active = deals.filter(d => ACTIVE_STAGES.has(d['Deal Stage']));
+    const won    = deals.filter(d => /won/i.test(d['Deal Stage']  || ''));
+    const lost   = deals.filter(d => /lost/i.test(d['Deal Stage'] || ''));
+
+    // KPIs
+    const totalFee    = active.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
+    const weightedFee = active.reduce((s, d) =>
+      s + (Number(d['Fee Income']) || 0) * weight(d['Deal Stage']), 0);
+    const winDenom    = won.length + lost.length;
+    const winRate     = winDenom > 0 ? Math.round(won.length / winDenom * 100) : null;
+
+    document.getElementById('kpiPipeline').textContent    = fmt(totalFee);
+    document.getElementById('kpiPipelineSub').textContent = active.length + ' active deals';
+    document.getElementById('kpiWeighted').textContent    = fmt(weightedFee);
+    document.getElementById('kpiWinRate').textContent     = winRate != null ? winRate + '%' : 'N/A';
+    document.getElementById('kpiWinRateSub').textContent  = `${won.length} won · ${lost.length} lost`;
+    document.getElementById('kpiActive').textContent      = active.length;
+    document.getElementById('kpiActiveSub').textContent   = deals.length + ' total deals';
+
+    // Chart: fee income by stage
+    const stageRows = STAGE_ORDER.map(s => {
+      const ds  = active.filter(d => d['Deal Stage'] === s);
+      const fee = ds.reduce((sum, d) => sum + (Number(d['Fee Income']) || 0), 0);
+      return { s, fee, wfee: fee * weight(s) };
+    }).filter(r => r.fee > 0);
+
+    new Chart(document.getElementById('chartStage'), {
+      type: 'bar',
+      data: {
+        labels: stageRows.map(r => r.s),
+        datasets: [
+          { label: 'Fee Income', data: stageRows.map(r => r.fee),  backgroundColor: '#3b82f6', borderRadius: 4 },
+          { label: 'Weighted',   data: stageRows.map(r => r.wfee), backgroundColor: '#93c5fd', borderRadius: 4 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } } },
+        scales: {
+          y: { ticks: { callback: v => fmt(v), font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+
+    // Chart: doughnut by project type
+    const typeRows = groupBy(active, 'Project Type', 'Fee Income');
+    new Chart(document.getElementById('chartType'), {
+      type: 'doughnut',
+      data: {
+        labels: typeRows.map(r => r[0]),
+        datasets: [{
+          data: typeRows.map(r => r[1]),
+          backgroundColor: PALETTE,
+          borderWidth: 2, borderColor: '#fff',
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)}` } },
+        },
+      },
+    });
+
+    // Chart: horizontal bar by industry (top 10)
+    const indRows = groupBy(active, 'Project Industry', 'Fee Income').slice(0, 10);
+    new Chart(document.getElementById('chartIndustry'), {
+      type: 'bar',
+      data: {
+        labels: indRows.map(r => r[0]),
+        datasets: [{
+          data: indRows.map(r => r[1]),
+          backgroundColor: '#7c3aed', borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { callback: v => fmt(v), font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          y: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+
+    // Office split bars
+    const officeRows  = groupBy(active, 'Office Involved', 'Fee Income');
+    const officeTotal = officeRows.reduce((s, r) => s + r[1], 0);
+    document.getElementById('officeBars').innerHTML = officeRows.map(([name, val]) => {
+      const pct   = officeTotal > 0 ? Math.round(val / officeTotal * 100) : 0;
+      const color = OFFICE_COLORS[name] || '#64748b';
+      return `
+        <div>
+          <div class="office-label-row">
+            <span class="office-name">${name}</span>
+            <span class="office-meta">${fmt(val)} · ${pct}%</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Deals table — active, sorted by fee income desc
+    const sorted = [...active].sort((a, b) =>
+      (Number(b['Fee Income']) || 0) - (Number(a['Fee Income']) || 0)
+    );
+    document.getElementById('tableCount').textContent = sorted.length + ' deals';
+    document.getElementById('tableBody').innerHTML = sorted.map(d => {
+      const fee      = Number(d['Fee Income']) || 0;
+      const weighted = fee * weight(d['Deal Stage']);
+      return `
+        <tr>
+          <td><strong>${d['Deal Name'] || '—'}</strong></td>
+          <td>${d['Company Name'] || '—'}</td>
+          <td>${d['Deal Owner']   || '—'}</td>
+          <td>${badge(d['Deal Stage'])}</td>
+          <td>${d['Project Type'] || '—'}</td>
+          <td class="num">${fmtFull(fee)}</td>
+          <td class="num muted">${fmtFull(weighted)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  init();
+</script>
+</body>
+</html>
