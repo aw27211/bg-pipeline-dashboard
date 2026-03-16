@@ -190,7 +190,7 @@
         <div class="kpi-sub"  id="kpiWinRateSub"></div>
       </div>
       <div class="kpi-card purple">
-        <div class="kpi-label">Active Deals</div>
+        <div class="kpi-label">Pipeline Deals</div>
         <div class="kpi-value" id="kpiActive">—</div>
         <div class="kpi-sub"  id="kpiActiveSub"></div>
       </div>
@@ -224,7 +224,7 @@
     <!-- Deals table -->
     <div class="table-card">
       <div class="table-header">
-        <div class="card-title" style="margin:0">Active Deals</div>
+        <div class="card-title" style="margin:0">Pipeline Deals</div>
         <div class="table-count" id="tableCount"></div>
       </div>
       <div class="table-wrap">
@@ -252,16 +252,15 @@
   const API_URL = 'https://script.google.com/macros/s/AKfycbyOSBljdZe8_SSx5MmQyiaMrsV9pJ93EzYTdxaww6wws-dTaLFa-tsMIY33PbsQjCVhjQ/exec';
 
   const STAGE_WEIGHTS = {
-    'Emerging Opportunity': 0.05,
-    'Brief':                0.10,
-    'P2':                   0.50,
-    'P1':                   0.80,
-    '90% likely':           0.90,
-    'LIVE':                 1.00,
+    'Brief':      0.10,
+    'P2':         0.50,
+    'P1':         0.80,
+    '90% likely': 0.90,
   };
 
-  const STAGE_ORDER  = ['Emerging Opportunity', 'Brief', 'P2', 'P1', '90% likely', 'LIVE'];
-  const ACTIVE_STAGES = new Set(STAGE_ORDER);
+  // Pipeline = Brief, P2, P1, 90% likely only. LIVE projects are excluded.
+  const PIPELINE_STAGES = new Set(['Brief', 'P2', 'P1', '90% likely']);
+  const STAGE_ORDER     = ['Brief', 'P2', 'P1', '90% likely'];
 
   const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#dc2626',
                    '#0891b2','#be185d','#78716c','#059669','#ea580c'];
@@ -328,28 +327,33 @@
     document.getElementById('loading').style.display   = 'none';
     document.getElementById('dashboard').style.display = 'block';
 
-    const active = deals.filter(d => ACTIVE_STAGES.has(d['Deal Stage']));
-    const won    = deals.filter(d => /won/i.test(d['Deal Stage']  || ''));
-    const lost   = deals.filter(d => /lost/i.test(d['Deal Stage'] || ''));
+    // Pipeline = Brief, P2, P1, 90% likely only (LIVE excluded)
+    const pipeline = deals.filter(d => PIPELINE_STAGES.has(d['Deal Stage']));
+
+    // 2026 win rate only
+    const won2026  = deals.filter(d => /won/i.test(d['Deal Stage'] || '') &&
+      (d['Close Date'] || '').startsWith('2026'));
+    const lost2026 = deals.filter(d => /lost/i.test(d['Deal Stage'] || '') &&
+      (d['Close Date'] || '').startsWith('2026'));
 
     // KPIs
-    const totalFee    = active.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
-    const weightedFee = active.reduce((s, d) =>
+    const totalFee    = pipeline.reduce((s, d) => s + (Number(d['Fee Income']) || 0), 0);
+    const weightedFee = pipeline.reduce((s, d) =>
       s + (Number(d['Fee Income']) || 0) * weight(d['Deal Stage']), 0);
-    const winDenom    = won.length + lost.length;
-    const winRate     = winDenom > 0 ? Math.round(won.length / winDenom * 100) : null;
+    const winDenom    = won2026.length + lost2026.length;
+    const winRate     = winDenom > 0 ? Math.round(won2026.length / winDenom * 100) : null;
 
     document.getElementById('kpiPipeline').textContent    = fmt(totalFee);
-    document.getElementById('kpiPipelineSub').textContent = active.length + ' active deals';
+    document.getElementById('kpiPipelineSub').textContent = `${pipeline.length} deals · Brief, P2, P1, 90%`;
     document.getElementById('kpiWeighted').textContent    = fmt(weightedFee);
     document.getElementById('kpiWinRate').textContent     = winRate != null ? winRate + '%' : 'N/A';
-    document.getElementById('kpiWinRateSub').textContent  = `${won.length} won · ${lost.length} lost`;
-    document.getElementById('kpiActive').textContent      = active.length;
-    document.getElementById('kpiActiveSub').textContent   = deals.length + ' total deals';
+    document.getElementById('kpiWinRateSub').textContent  = `2026: ${won2026.length} won · ${lost2026.length} lost`;
+    document.getElementById('kpiActive').textContent      = pipeline.length;
+    document.getElementById('kpiActiveSub').textContent   = `${deals.length} total deals in CRM`;
 
     // Chart: fee income by stage
     const stageRows = STAGE_ORDER.map(s => {
-      const ds  = active.filter(d => d['Deal Stage'] === s);
+      const ds  = pipeline.filter(d => d['Deal Stage'] === s);
       const fee = ds.reduce((sum, d) => sum + (Number(d['Fee Income']) || 0), 0);
       return { s, fee, wfee: fee * weight(s) };
     }).filter(r => r.fee > 0);
@@ -374,7 +378,7 @@
     });
 
     // Chart: doughnut by project type
-    const typeRows = groupBy(active, 'Project Type', 'Fee Income');
+    const typeRows = groupBy(pipeline, 'Project Type', 'Fee Income');
     new Chart(document.getElementById('chartType'), {
       type: 'doughnut',
       data: {
@@ -395,7 +399,7 @@
     });
 
     // Chart: horizontal bar by industry (top 10)
-    const indRows = groupBy(active, 'Project Industry', 'Fee Income').slice(0, 10);
+    const indRows = groupBy(pipeline, 'Project Industry', 'Fee Income').slice(0, 10);
     new Chart(document.getElementById('chartIndustry'), {
       type: 'bar',
       data: {
@@ -417,7 +421,7 @@
     });
 
     // Office split bars
-    const officeRows  = groupBy(active, 'Office Involved', 'Fee Income');
+    const officeRows  = groupBy(pipeline, 'Office Involved', 'Fee Income');
     const officeTotal = officeRows.reduce((s, r) => s + r[1], 0);
     document.getElementById('officeBars').innerHTML = officeRows.map(([name, val]) => {
       const pct   = officeTotal > 0 ? Math.round(val / officeTotal * 100) : 0;
@@ -434,8 +438,8 @@
         </div>`;
     }).join('');
 
-    // Deals table — active, sorted by fee income desc
-    const sorted = [...active].sort((a, b) =>
+    // Deals table — pipeline deals, sorted by fee income desc
+    const sorted = [...pipeline].sort((a, b) =>
       (Number(b['Fee Income']) || 0) - (Number(a['Fee Income']) || 0)
     );
     document.getElementById('tableCount').textContent = sorted.length + ' deals';
