@@ -170,6 +170,7 @@
   </div>
 
   <div id="errorBox" class="error-box" style="display:none"></div>
+  <div id="fxWarning" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.82rem;color:#92400e;"></div>
 
   <div id="dashboard" style="display:none">
 
@@ -333,14 +334,29 @@
     }
   }
 
+  // Tracks currencies we couldn't convert
+  const UNKNOWN_CURRENCIES = new Set();
+
   // Convert any amount to GBP
   function toGBP(amount, currency) {
     const val = Number(amount);
     if (!val || isNaN(val)) return 0;
     if (!currency || currency === 'GBP') return val;
-    const rate = FX_RATES[currency.toUpperCase()];
-    if (!rate) return val; // unknown currency — use as-is
+    const key  = currency.toUpperCase();
+    const rate = FX_RATES[key];
+    if (!rate) {
+      UNKNOWN_CURRENCIES.add(key);
+      return val; // unknown currency — use as-is
+    }
     return val / rate;
+  }
+
+  function showFxWarning() {
+    if (UNKNOWN_CURRENCIES.size === 0) return;
+    const el   = document.getElementById('fxWarning');
+    const list = [...UNKNOWN_CURRENCIES].join(', ');
+    el.innerHTML = `⚠️ <strong>Currency conversion warning:</strong> The following currencies could not be converted to GBP and are included at face value — totals may be inaccurate: <strong>${list}</strong>`;
+    el.style.display = 'block';
   }
 
   // ── Main ──────────────────────────────────────────────────
@@ -512,6 +528,8 @@
           <td class="num muted">${fmtFull(weighted)}</td>
         </tr>`;
     }).join('');
+
+    showFxWarning();
   }
 
   init();
