@@ -907,10 +907,15 @@
         const totalAcrossYears = WON_FEE_AVG_YEARS.reduce((s, yr) => s + wfFee[yr][mo], 0);
         const avg = yearsWithData.length > 0 ? totalAcrossYears / WON_FEE_AVG_YEARS.length : null;
         if (avg !== null) { avgRowSum += avg; avgRowMonths++; }
+        const monthlyTotals = WON_FEE_AVG_YEARS.filter(yr => wfCount[yr][mo] > 0).map(yr => wfFee[yr][mo]).sort((a, b) => a - b);
+        const mid = Math.floor(monthlyTotals.length / 2);
+        const median = monthlyTotals.length === 0 ? null
+          : monthlyTotals.length % 2 === 1 ? monthlyTotals[mid]
+          : (monthlyTotals[mid - 1] + monthlyTotals[mid]) / 2;
         const c     = wfColor(avg, maxTotal);
         const label = avg !== null ? fmt(avg) : '—';
         const tip   = avg !== null
-          ? `${MONTHS[mo]} 4yr avg total: ${fmt(avg)}`
+          ? `${MONTHS[mo]} 4yr avg: ${fmt(avg)}  |  Median: ${fmt(median)}`
           : `${MONTHS[mo]}: No data`;
         g += `<div title="${tip}" style="background:${c.bg};color:${c.text};border:1.5px solid ${c.border};
           border-radius:5px;padding:0.3rem 0.2rem;text-align:center;cursor:default;min-width:46px;line-height:1.4">
