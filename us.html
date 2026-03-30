@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BG Pipeline — North America</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    header .subtitle { font-size: 0.8rem; color: #94a3b8; margin-top: 2px; }
+    #lastUpdated { font-size: 0.75rem; color: #64748b; }
+    .back-link {
+      font-size: 0.78rem; color: #94a3b8; text-decoration: none;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    .back-link:hover { color: white; }
+
+    main { padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; }
+
+    .loading { text-align: center; padding: 5rem; color: #64748b; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-box {
+      background: #fef2f2; border: 1px solid #fecaca;
+      border-radius: 8px; padding: 1.5rem; color: #dc2626;
+      margin: 2rem 0;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .kpi-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      border-left: 4px solid transparent;
+    }
+    .kpi-card.blue   { border-color: #2563eb; }
+    .kpi-card.green  { border-color: #16a34a; }
+    .kpi-card.amber  { border-color: #d97706; }
+    .kpi-card.purple { border-color: #7c3aed; }
+    .kpi-label {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #94a3b8; margin-bottom: 0.5rem;
+    }
+    .kpi-value { font-size: 1.8rem; font-weight: 700; color: #0f172a; line-height: 1; }
+    .kpi-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 0.3rem; }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    }
+    .card-title {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: #94a3b8; margin-bottom: 1rem;
+    }
+    .chart-wrap { position: relative; height: 260px; }
+
+    .table-card {
+      background: white;
+      border-radius: 10px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+      margin-bottom: 1.5rem;
+    }
+    .table-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 1rem;
+    }
+    .table-count { font-size: 0.78rem; color: #94a3b8; }
+    .table-wrap  { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.855rem; }
+    thead th {
+      text-align: left; padding: 0.6rem 0.75rem;
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: #94a3b8; border-bottom: 2px solid #f1f5f9;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid #f8fafc; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    tbody td { padding: 0.7rem 0.75rem; color: #374151; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { color: #94a3b8; }
+
+    .badge {
+      display: inline-block; padding: 0.2rem 0.55rem;
+      border-radius: 999px; font-size: 0.68rem; font-weight: 700;
+    }
+    .badge-emerging { background:#f0f9ff; color:#0369a1; }
+    .badge-brief    { background:#eff6ff; color:#1d4ed8; }
+    .badge-p2       { background:#f0fdf4; color:#15803d; }
+    .badge-p1       { background:#fefce8; color:#854d0e; }
+    .badge-90       { background:#fff7ed; color:#c2410c; }
+    .badge-live     { background:#dcfce7; color:#166534; }
+    .badge-default  { background:#f1f5f9; color:#64748b; }
+
+    .tag {
+      display: inline-block; padding: 0.15rem 0.45rem;
+      border-radius: 4px; font-size: 0.68rem; font-weight: 600;
+      background: #eff6ff; color: #1d4ed8;
+    }
+    .tag-global  { background: #f5f3ff; color: #7c3aed; }
+    .tag-multi   { background: #fefce8; color: #854d0e; }
+
+    /* Slider */
+    .slider-wrap { display: flex; align-items: center; gap: 0.5rem; min-width: 140px; }
+    .slider-wrap input[type=range] {
+      flex: 1; height: 4px; cursor: pointer; accent-color: #2563eb;
+    }
+    .slider-pct {
+      font-size: 0.78rem; font-weight: 700; color: #0f172a;
+      min-width: 36px; text-align: right;
+    }
+
+    @media (max-width: 900px) {
+      .kpi-grid    { grid-template-columns: repeat(2, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
+      main { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BG Pipeline — North America</h1>
+    <div class="subtitle">North America &amp; Global deals · All values in USD · GBP converted at $1.27</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:1.5rem">
+    <a href="/" class="back-link">← Global Dashboard</a>
+    <div id="lastUpdated" style="font-size:0.75rem;color:#64748b">Loading…</div>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Fetching pipeline data…</p>
+  </div>
+
+  <div id="errorBox" class="error-box" style="display:none"></div>
+
+  <div id="dashboard" style="display:none">
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-label">US Weighted Pipeline</div>
+        <div class="kpi-value" id="kpiWeighted">—</div>
+        <div class="kpi-sub">Probability × US allocation</div>
+        <div id="kpiWeightedDelta" style="margin-top:0.5rem"></div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">US Full Fee Value</div>
+        <div class="kpi-value" id="kpiFull">—</div>
+        <div class="kpi-sub" id="kpiFullSub"></div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">US Pipeline Deals</div>
+        <div class="kpi-value" id="kpiDeals">—</div>
+        <div class="kpi-sub" id="kpiDealsSub"></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">US Share of Global</div>
+        <div class="kpi-value" id="kpiShare">—</div>
+        <div class="kpi-sub">Of global weighted pipeline</div>
+      </div>
+      <div class="kpi-card" style="border-color:#d97706">
+        <div class="kpi-label">2026 Win Rate (NA)</div>
+        <div class="kpi-value" id="kpiWinRate">—</div>
+        <div class="kpi-sub" id="kpiWinRateSub"></div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="card-title">US Weighted Value by Stage</div>
+        <div class="chart-wrap"><canvas id="chartStage"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">US Pipeline by Project Type</div>
+        <div class="chart-wrap"><canvas id="chartType"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Monthly Briefs chart (NA only) -->
+    <div class="chart-card" style="margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+        <div class="card-title" style="margin:0">Monthly Briefs Received — North America</div>
+        <div id="briefYearToggles" style="display:flex;flex-wrap:wrap;gap:0.6rem;align-items:center"></div>
+      </div>
+      <div class="chart-wrap" style="height:240px"><canvas id="chartBriefs"></canvas></div>
+    </div>
+
+    <!-- Win Rate Heatmap (NA only) -->
+    <div class="chart-card" style="margin-bottom:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+        <div class="card-title" style="margin:0">Monthly Win Rate — North America</div>
+        <div id="naHeatmapLegend" style="display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;color:#94a3b8"></div>
+      </div>
+      <div id="naWinRateHeatmap" style="overflow-x:auto"></div>
+      <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.6rem">* 2026 shows partial year only. 4yr avg covers 2022–2025.</div>
+    </div>
+
+    <!-- Allocation + deals table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="card-title" style="margin:0">US Deal Allocations</div>
+        <div class="table-count" id="tableCount"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Deal Name</th>
+              <th>Client</th>
+              <th>Stage</th>
+              <th>Region Tag</th>
+              <th>US Allocation</th>
+              <th class="num">Fee Income (USD)</th>
+              <th class="num">US Weighted</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyOSBljdZe8_SSx5MmQyiaMrsV9pJ93EzYTdxaww6wws-dTaLFa-tsMIY33PbsQjCVhjQ/exec';
+  const LS_KEY  = 'us_allocations';
+
+  const GBP_TO_USD = 1.27; // approximate conversion rate
+
+  const STAGE_WEIGHTS   = { 'Brief': 0.10, 'P2': 0.50, 'P1': 0.80, '90% likely': 0.90 };
+  const PIPELINE_STAGES = new Set(['Brief', 'P2', 'P1', '90% likely']);
+  const WON_STAGES      = new Set(['LIVE', 'Project Wrap up', 'Closed Won']);
+  const LOST_STAGES     = new Set(['Lost']);
+  const STAGE_ORDER     = ['Brief', 'P2', 'P1', '90% likely'];
+  const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#dc2626',
+                   '#0891b2','#be185d','#78716c','#059669','#ea580c'];
+
+  let stageChart   = null;
+  let typeChart    = null;
+  let allDeals     = [];
+  let allSnapshots = [];
+  let allocations  = {};
+
+  // ── Briefs chart toggle ───────────────────────────────────
+  window._naBriefsChart = null;
+  function toggleNABriefDataset(idx, checked) {
+    if (!window._naBriefsChart) return;
+    window._naBriefsChart.data.datasets[idx].hidden = !checked;
+    window._naBriefsChart.update();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function feeGBP(deal) {
+    return (Number(deal['Fee Income GBP']) || Number(deal['Amount GBP']) || 0) * GBP_TO_USD;
+  }
+
+  function weight(stage) { return STAGE_WEIGHTS[stage] ?? 0; }
+
+  function isUSRelevant(deal) {
+    const o = (deal['Office Involved'] || '').trim();
+    const hasUS = o.includes('North America') || o.includes('US');
+    return hasUS && PIPELINE_STAGES.has(deal['Deal Stage']);
+  }
+
+  function defaultAllocation(deal) {
+    const o = (deal['Office Involved'] || '').trim();
+    const hasUS     = o.includes('North America') || o.includes('US');
+    const hasGlobal = o.includes('Global');
+    if (hasUS && hasGlobal) return 50;
+    if (hasUS) return 100;
+    return 0;
+  }
+
+  function getAllocation(deal) {
+    const saved = allocations[String(deal['Deal ID'])];
+    return saved !== undefined ? saved : defaultAllocation(deal);
+  }
+
+  function usWeighted(deal) {
+    return feeGBP(deal) * weight(deal['Deal Stage']) * (getAllocation(deal) / 100);
+  }
+
+  function usFull(deal) {
+    return feeGBP(deal) * (getAllocation(deal) / 100);
+  }
+
+  function loadAllocations() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch { return {}; }
+  }
+
+  function saveAllocations() {
+    localStorage.setItem(LS_KEY, JSON.stringify(allocations));
+  }
+
+  function fmt(n) {
+    const v = Number(n);
+    if (!v || isNaN(v)) return '—';
+    if (v >= 1_000_000) return '$' + (v / 1_000_000).toFixed(1) + 'm';
+    if (v >= 1_000)     return '$' + (v / 1_000).toFixed(0) + 'k';
+    return '$' + v.toFixed(0);
+  }
+
+  function fmtFull(n) {
+    const v = Number(n);
+    if (!v || isNaN(v) || v === 0) return '—';
+    return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+
+  function badge(stage) {
+    const map = {
+      'Emerging Opportunity': 'badge-emerging',
+      'Brief': 'badge-brief', 'P2': 'badge-p2',
+      'P1': 'badge-p1', '90% likely': 'badge-90', 'LIVE': 'badge-live',
+    };
+    return `<span class="badge ${map[stage] || 'badge-default'}">${stage || '—'}</span>`;
+  }
+
+  function regionTag(deal) {
+    const o = (deal['Office Involved'] || '').trim();
+    if (o.includes('North America') && o.includes('Global')) return `<span class="tag tag-multi">${o}</span>`;
+    if (o.includes('Global'))       return `<span class="tag tag-global">Global</span>`;
+    if (o.includes('North America')) return `<span class="tag">North America</span>`;
+    return `<span class="tag tag-multi">${o || '—'}</span>`;
+  }
+
+  function isNATagged(deal) {
+    const o = (deal['Office Involved'] || '').trim();
+    return o.includes('North America') || o.includes('US');
+  }
+
+  function getYear(dateVal) {
+    if (!dateVal) return null;
+    const y = new Date(dateVal).getFullYear();
+    return isNaN(y) ? null : y;
+  }
+
+  // ── KPI update ────────────────────────────────────────────
+  function updateKPIs(pipeline) {
+    const totalWeighted = pipeline.reduce((s, d) => s + usWeighted(d), 0);
+    const totalFull     = pipeline.reduce((s, d) => s + usFull(d), 0);
+
+    // Global weighted for share calculation
+    const globalWeighted = allDeals
+      .filter(d => PIPELINE_STAGES.has(d['Deal Stage']))
+      .reduce((s, d) => s + feeGBP(d) * weight(d['Deal Stage']), 0);
+
+    const share = globalWeighted > 0 ? Math.round(totalWeighted / globalWeighted * 100) : 0;
+
+    // Win rate — NA-tagged deals only, 2026
+    const naDeals   = allDeals.filter(isNATagged);
+    const won2026   = naDeals.filter(d => WON_STAGES.has(d['Deal Stage'])  && getYear(d['Date Entered LIVE']) === 2026);
+    const lost2026  = naDeals.filter(d => LOST_STAGES.has(d['Deal Stage']) && getYear(d['Date Entered Lost']) === 2026);
+    const winDenom  = won2026.length + lost2026.length;
+    const winRate   = winDenom > 0 ? Math.round(won2026.length / winDenom * 100) : null;
+
+    document.getElementById('kpiWeighted').textContent  = fmt(totalWeighted);
+    document.getElementById('kpiFull').textContent      = fmt(totalFull);
+    document.getElementById('kpiFullSub').textContent   = `${pipeline.length} deals at full allocation`;
+    document.getElementById('kpiDeals').textContent     = pipeline.length;
+    document.getElementById('kpiDealsSub').textContent  = `North America tagged deals`;
+    document.getElementById('kpiShare').textContent     = share + '%';
+    document.getElementById('kpiWinRate').textContent   = winRate != null ? winRate + '%' : 'N/A';
+    document.getElementById('kpiWinRateSub').textContent = `${won2026.length} won · ${lost2026.length} lost`;
+
+    // ── YOY delta vs same month last year (from snapshots) ───
+    const now       = new Date();
+    const curMo     = now.getMonth();
+    const curYr     = now.getFullYear();
+    const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const snapMap   = {};
+    allSnapshots.forEach(s => {
+      if (!snapMap[s.year]) snapMap[s.year] = {};
+      snapMap[s.year][s.month] = s;
+    });
+    const snapPrev  = (snapMap[curYr - 1] || {})[curMo];
+    const baseline  = snapPrev ? snapPrev.usWeightedGBP * GBP_TO_USD : null;
+    if (baseline && totalWeighted > 0) {
+      const pct   = Math.round((totalWeighted - baseline) / baseline * 100);
+      const up    = pct >= 0;
+      const color = up ? '#16a34a' : '#dc2626';
+      const bg    = up ? '#dcfce7' : '#fee2e2';
+      const arrow = up ? '↑' : '↓';
+      document.getElementById('kpiWeightedDelta').innerHTML =
+        `<span title="vs ${MONTH_NAMES[curMo]} ${curYr - 1} snapshot: ${fmt(baseline)}"
+          style="font-size:0.7rem;font-weight:700;background:${bg};color:${color};
+          padding:0.15rem 0.45rem;border-radius:4px;white-space:nowrap;display:inline-block">
+          ${arrow} ${Math.abs(pct)}% vs ${MONTH_NAMES[curMo]} ${curYr - 1}
+        </span>`;
+    }
+  }
+
+  // ── Chart update ──────────────────────────────────────────
+  function updateCharts(pipeline) {
+    // Stage bar
+    const stageData = STAGE_ORDER.map(s => {
+      const ds = pipeline.filter(d => d['Deal Stage'] === s);
+      return ds.reduce((sum, d) => sum + usWeighted(d), 0);
+    });
+
+    if (stageChart) {
+      stageChart.data.datasets[0].data = stageData;
+      stageChart.update();
+    }
+
+    // Project type donut
+    const typeMap = {};
+    pipeline.forEach(d => {
+      const k = (d['Project Type'] || 'Unknown').toString().trim();
+      typeMap[k] = (typeMap[k] || 0) + usWeighted(d);
+    });
+    const typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1]);
+
+    if (typeChart) {
+      typeChart.data.labels             = typeEntries.map(r => r[0]);
+      typeChart.data.datasets[0].data   = typeEntries.map(r => r[1]);
+      typeChart.update();
+    }
+  }
+
+  // ── Table render ──────────────────────────────────────────
+  function renderTable(pipeline) {
+    const sorted = [...pipeline].sort((a, b) => usWeighted(b) - usWeighted(a));
+    document.getElementById('tableCount').textContent = sorted.length + ' deals';
+    document.getElementById('tableBody').innerHTML = sorted.map(d => {
+      const id  = String(d['Deal ID']);
+      const pct = getAllocation(d);
+      const fee = feeGBP(d);
+      const uw  = usWeighted(d);
+      return `
+        <tr>
+          <td><strong>${d['Deal Name'] || '—'}</strong></td>
+          <td>${d['Company Name'] || '—'}</td>
+          <td>${badge(d['Deal Stage'])}</td>
+          <td>${regionTag(d)}</td>
+          <td>
+            <div class="slider-wrap">
+              <input type="range" min="0" max="100" step="5" value="${pct}"
+                data-id="${id}"
+                oninput="onSlider(this)">
+              <span class="slider-pct" id="pct-${id}">${pct}%</span>
+            </div>
+          </td>
+          <td class="num">${fmtFull(fee)}</td>
+          <td class="num" id="uw-${id}">${fmtFull(uw)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ── Slider handler ────────────────────────────────────────
+  function onSlider(input) {
+    const id  = input.dataset.id;
+    const pct = Number(input.value);
+    allocations[id] = pct;
+    saveAllocations();
+
+    // Update just this row's display
+    document.getElementById('pct-' + id).textContent = pct + '%';
+    const deal = allDeals.find(d => String(d['Deal ID']) === id);
+    if (deal) {
+      document.getElementById('uw-' + id).textContent = fmtFull(usWeighted(deal));
+    }
+
+    // Re-render KPIs and charts
+    const pipeline = allDeals.filter(isUSRelevant);
+    updateKPIs(pipeline);
+    updateCharts(pipeline);
+  }
+
+  // ── Init charts ───────────────────────────────────────────
+  function initCharts(pipeline) {
+    const stageData = STAGE_ORDER.map(s =>
+      pipeline.filter(d => d['Deal Stage'] === s).reduce((sum, d) => sum + usWeighted(d), 0)
+    );
+
+    stageChart = new Chart(document.getElementById('chartStage'), {
+      type: 'bar',
+      data: {
+        labels: STAGE_ORDER,
+        datasets: [{
+          label: 'US Weighted Value',
+          data: stageData,
+          backgroundColor: '#2563eb', borderRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { ticks: { callback: v => fmt(v), font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+
+    const typeMap = {};
+    pipeline.forEach(d => {
+      const k = (d['Project Type'] || 'Unknown').toString().trim();
+      typeMap[k] = (typeMap[k] || 0) + usWeighted(d);
+    });
+    const typeEntries = Object.entries(typeMap).sort((a, b) => b[1] - a[1]);
+
+    typeChart = new Chart(document.getElementById('chartType'), {
+      type: 'doughnut',
+      data: {
+        labels: typeEntries.map(r => r[0]),
+        datasets: [{
+          data: typeEntries.map(r => r[1]),
+          backgroundColor: PALETTE,
+          borderWidth: 2, borderColor: '#fff',
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)}` } },
+        },
+      },
+    });
+  }
+
+  // ── NA win rate heatmap ───────────────────────────────────
+  function renderHeatmap(deals) {
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const HEATMAP_YEARS = [2022, 2023, 2024, 2025, 2026];
+    const AVG_YEARS     = [2022, 2023, 2024, 2025];
+    const currentMonth  = new Date().getMonth();
+
+    const naDeals = deals.filter(isNATagged);
+    const hmWon  = {};
+    const hmLost = {};
+    HEATMAP_YEARS.forEach(yr => { hmWon[yr] = Array(12).fill(0); hmLost[yr] = Array(12).fill(0); });
+
+    naDeals.forEach(d => {
+      const wonRaw = d['Date Entered LIVE'];
+      if (wonRaw && WON_STAGES.has(d['Deal Stage'])) {
+        const dt = new Date(wonRaw);
+        if (!isNaN(dt)) { const yr = dt.getFullYear(), mo = dt.getMonth(); if (hmWon[yr]) hmWon[yr][mo]++; }
+      }
+      const lostRaw = d['Date Entered Lost'];
+      if (lostRaw && LOST_STAGES.has(d['Deal Stage'])) {
+        const dt = new Date(lostRaw);
+        if (!isNaN(dt)) { const yr = dt.getFullYear(), mo = dt.getMonth(); if (hmLost[yr]) hmLost[yr][mo]++; }
+      }
+    });
+
+    function hmColor(rate) {
+      if (rate === null) return { bg: '#f8fafc', text: '#94a3b8', border: '#e2e8f0' };
+      if (rate >= 0.8)   return { bg: '#3B6D11', text: '#ffffff',  border: '#3B6D11' };
+      if (rate >= 0.6)   return { bg: '#97C459', text: '#27500A',  border: '#97C459' };
+      if (rate >= 0.4)   return { bg: '#EAF3DE', text: '#27500A',  border: '#c8e0a8' };
+      if (rate >= 0.2)   return { bg: '#F09595', text: '#791F1F',  border: '#F09595' };
+      return               { bg: '#FCEBEB', text: '#791F1F',  border: '#f5c6c6' };
+    }
+
+    function hmCell(won, total, isNoData, isFuture, yr, mo) {
+      const rate   = total > 0 ? won / total : null;
+      const c      = hmColor(isNoData ? null : rate);
+      const label  = isNoData ? '—' : `${won}/${total}`;
+      const pctTip = rate !== null ? Math.round(rate * 100) + '%' : 'No data';
+      const tip    = `${MONTHS[mo]} ${yr}: ${pctTip} (${won} won, ${total - won} lost)`;
+      const opacity = isFuture ? 'opacity:0.45;' : '';
+      return `<div title="${tip}" style="${opacity}background:${c.bg};color:${c.text};border:1px solid ${c.border};
+        border-radius:5px;padding:0.3rem 0.2rem;text-align:center;font-size:0.72rem;font-weight:600;
+        cursor:default;min-width:46px;line-height:1.3">${label}</div>`;
+    }
+
+    const labelStyle = 'font-size:0.72rem;font-weight:700;color:#64748b;display:flex;align-items:center;padding-right:0.5rem;white-space:nowrap';
+    let gridHTML = `<div style="display:grid;grid-template-columns:56px repeat(12,1fr);gap:3px;min-width:600px">`;
+
+    // Header row
+    gridHTML += `<div></div>`;
+    MONTHS.forEach(m => {
+      gridHTML += `<div style="text-align:center;font-size:0.68rem;font-weight:700;color:#94a3b8;padding-bottom:4px">${m}</div>`;
+    });
+
+    // 4yr avg row (top)
+    gridHTML += `<div style="${labelStyle};color:#374151">4yr avg</div>`;
+    MONTHS.forEach((_, mo) => {
+      let totalWon = 0, totalDeals = 0;
+      AVG_YEARS.forEach(yr => { totalWon += hmWon[yr][mo]; totalDeals += hmWon[yr][mo] + hmLost[yr][mo]; });
+      const rate  = totalDeals > 0 ? totalWon / totalDeals : null;
+      const c     = hmColor(rate);
+      const label = rate !== null ? Math.round(rate * 100) + '%' : '—';
+      const tip   = rate !== null ? `${MONTHS[mo]} 4yr avg: ${Math.round(rate*100)}% (${totalWon}/${totalDeals})` : `${MONTHS[mo]}: No data`;
+      gridHTML += `<div title="${tip}" style="background:${c.bg};color:${c.text};border:1.5px solid ${c.border};
+        border-radius:5px;padding:0.3rem 0.2rem;text-align:center;font-size:0.72rem;font-weight:700;
+        cursor:default;min-width:46px;line-height:1.3">${label}</div>`;
+    });
+
+    // Divider
+    gridHTML += `<div style="grid-column:1/-1;border-top:1px solid #e2e8f0;margin:4px 0"></div>`;
+
+    // Year rows — newest first
+    [...HEATMAP_YEARS].reverse().forEach(yr => {
+      gridHTML += `<div style="${labelStyle}">${yr}</div>`;
+      MONTHS.forEach((_, mo) => {
+        const won   = hmWon[yr][mo];
+        const lost  = hmLost[yr][mo];
+        const total = won + lost;
+        const isFut = yr === 2026 && mo > currentMonth;
+        gridHTML += hmCell(won, total, total === 0 && !isFut, isFut, yr, mo);
+      });
+    });
+
+    gridHTML += `</div>`;
+    document.getElementById('naWinRateHeatmap').innerHTML = gridHTML;
+
+    const legendSwatches = [
+      { label: '0%',   bg: '#FCEBEB', text: '#791F1F' },
+      { label: '20%',  bg: '#F09595', text: '#791F1F' },
+      { label: '40%',  bg: '#EAF3DE', text: '#27500A' },
+      { label: '60%',  bg: '#97C459', text: '#27500A' },
+      { label: '80%+', bg: '#3B6D11', text: '#ffffff'  },
+    ];
+    document.getElementById('naHeatmapLegend').innerHTML =
+      '<span style="margin-right:0.3rem;color:#94a3b8">Win rate:</span>' +
+      legendSwatches.map(s =>
+        `<span style="background:${s.bg};color:${s.text};padding:0.15rem 0.45rem;border-radius:4px;font-weight:600">${s.label}</span>`
+      ).join('<span style="color:#cbd5e1">→</span>');
+  }
+
+  // ── NA briefs chart ───────────────────────────────────────
+  function renderBriefsChart(deals) {
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const thisYear   = new Date().getFullYear();
+    const BRIEF_YEARS = [thisYear-4, thisYear-3, thisYear-2, thisYear-1, thisYear];
+    const BRIEF_COLORS = {
+      [thisYear-4]: '#cbd5e1',
+      [thisYear-3]: '#94a3b8',
+      [thisYear-2]: '#64748b',
+      [thisYear-1]: '#3b82f6',
+      [thisYear]:   '#16a34a',
+    };
+
+    const naDeals = deals.filter(isNATagged);
+    const briefsByYearMonth = {};
+    naDeals.forEach(d => {
+      const raw = d['Date Entered Brief'];
+      if (!raw) return;
+      const date = new Date(raw);
+      if (isNaN(date)) return;
+      const yr = date.getFullYear();
+      const mo = date.getMonth();
+      if (yr < thisYear - 4) return;
+      if (!briefsByYearMonth[yr]) briefsByYearMonth[yr] = Array(12).fill(0);
+      briefsByYearMonth[yr][mo]++;
+    });
+
+    const yearsWithData = BRIEF_YEARS.filter(yr =>
+      briefsByYearMonth[yr] && briefsByYearMonth[yr].some(v => v > 0)
+    );
+    const avgData = MONTHS.map((_, mo) => {
+      if (!yearsWithData.length) return 0;
+      const sum = yearsWithData.reduce((s, yr) => s + ((briefsByYearMonth[yr] || [])[mo] || 0), 0);
+      return Math.round(sum / yearsWithData.length * 10) / 10;
+    });
+
+    const briefDatasets = [
+      ...BRIEF_YEARS.map(yr => ({
+        label: String(yr),
+        data: briefsByYearMonth[yr] || Array(12).fill(0),
+        borderColor: BRIEF_COLORS[yr],
+        backgroundColor: BRIEF_COLORS[yr] + '15',
+        borderWidth: yr === thisYear ? 2.5 : 1.5,
+        pointRadius: 3, tension: 0.3, fill: false,
+        hidden: !briefsByYearMonth[yr] || !briefsByYearMonth[yr].some(v => v > 0),
+      })),
+      {
+        label: '5yr Avg',
+        data: avgData,
+        borderColor: '#ef4444', borderWidth: 1.5,
+        borderDash: [5, 5], pointRadius: 0, tension: 0.3, fill: false,
+        hidden: yearsWithData.length === 0,
+      },
+    ];
+
+    window._naBriefsChart = new Chart(document.getElementById('chartBriefs'), {
+      type: 'line',
+      data: { labels: MONTHS, datasets: briefDatasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          x: { ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+
+    document.getElementById('briefYearToggles').innerHTML = [
+      ...BRIEF_YEARS.map((yr, i) => ({ label: String(yr), color: BRIEF_COLORS[yr], idx: i, hidden: briefDatasets[i].hidden })),
+      { label: '5yr Avg', color: '#ef4444', idx: BRIEF_YEARS.length, hidden: briefDatasets[BRIEF_YEARS.length].hidden },
+    ].map(({ label, color, idx, hidden }) => `
+      <label style="display:inline-flex;align-items:center;gap:0.3rem;cursor:pointer;font-size:0.74rem;font-weight:600;color:#374151;user-select:none">
+        <input type="checkbox" ${hidden ? '' : 'checked'} onchange="toggleNABriefDataset(${idx}, this.checked)"
+          style="accent-color:${color};cursor:pointer;width:13px;height:13px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color}"></span>
+        ${label}
+      </label>`
+    ).join('');
+  }
+
+  // ── Main ──────────────────────────────────────────────────
+  async function init() {
+    allocations = loadAllocations();
+
+    const controller = new AbortController();
+    const timeout    = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res  = await fetch(API_URL, { signal: controller.signal });
+      clearTimeout(timeout);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      allDeals     = data.deals     || [];
+      allSnapshots = data.snapshots || [];
+      const pipeline = allDeals.filter(isUSRelevant);
+
+      document.getElementById('loading').style.display   = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('lastUpdated').textContent =
+        'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+      updateKPIs(pipeline);
+      initCharts(pipeline);
+      renderBriefsChart(allDeals);
+      renderHeatmap(allDeals);
+      renderTable(pipeline);
+
+    } catch (err) {
+      clearTimeout(timeout);
+      document.getElementById('loading').style.display = 'none';
+      const el = document.getElementById('errorBox');
+      el.style.display = 'block';
+      el.textContent   = err.name === 'AbortError'
+        ? 'Could not load data: request timed out after 15 seconds. Try refreshing.'
+        : 'Could not load data: ' + err.message;
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
