@@ -936,29 +936,30 @@
       // Divider
       g += `<div style="grid-column:1/-1;border-top:1px solid #e2e8f0;margin:4px 0"></div>`;
 
+      // Median monthly across last 4 years (used in Total column tooltip)
+      const allMonthlyFees4yr = WON_FEE_AVG_YEARS.flatMap(yr =>
+        MONTHS.map((_, mo) => wfFee[yr][mo]).filter(v => v > 0)
+      ).sort((a, b) => a - b);
+      const amf4mid = Math.floor(allMonthlyFees4yr.length / 2);
+      const median4yrMonthly = allMonthlyFees4yr.length === 0 ? null
+        : allMonthlyFees4yr.length % 2 === 1 ? allMonthlyFees4yr[amf4mid]
+        : (allMonthlyFees4yr[amf4mid - 1] + allMonthlyFees4yr[amf4mid]) / 2;
+
       // Year rows — newest first
       [...WON_FEE_YEARS].reverse().forEach(yr => {
         g += `<div style="${labelStyle}">${yr}</div>`;
         let yearTotal = 0, yearCount = 0;
-        const monthlyFees = [];
         MONTHS.forEach((_, mo) => {
           const isFut = yr === 2026 && mo > currentMonth;
           g += wfCell(wfFee[yr][mo], wfCount[yr][mo], isFut, yr, mo);
           if (!isFut) { yearTotal += wfFee[yr][mo]; yearCount += wfCount[yr][mo]; }
-          if (!isFut && wfFee[yr][mo] > 0) monthlyFees.push(wfFee[yr][mo]);
         });
-        // Median of monthly totals for this year
-        const sortedMonthlyFees = [...monthlyFees].sort((a, b) => a - b);
-        const smid = Math.floor(sortedMonthlyFees.length / 2);
-        const medianMonthly = sortedMonthlyFees.length === 0 ? null
-          : sortedMonthlyFees.length % 2 === 1 ? sortedMonthlyFees[smid]
-          : (sortedMonthlyFees[smid - 1] + sortedMonthlyFees[smid]) / 2;
-        const yearTip = medianMonthly !== null
-          ? `title="Median month: ${fmt(medianMonthly)} (${sortedMonthlyFees.length} months)"`
+        const yearTip = median4yrMonthly !== null
+          ? `title="Median month (4yr): ${fmt(median4yrMonthly)}"`
           : '';
         // Year total cell
         g += `<div ${yearTip} style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:0.3rem 0.2rem;
-          text-align:center;cursor:${medianMonthly !== null ? 'help' : 'default'};min-width:56px;line-height:1.4">
+          text-align:center;cursor:${median4yrMonthly !== null ? 'help' : 'default'};min-width:56px;line-height:1.4">
           <div style="font-size:0.72rem;font-weight:700;color:#374151">${yearTotal > 0 ? fmt(yearTotal) : '—'}</div>
           <div style="font-size:0.6rem;color:#94a3b8">${yearCount > 0 ? 'total' : ''}</div>
         </div>`;
