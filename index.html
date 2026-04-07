@@ -924,8 +924,11 @@
       });
       // Total cell for avg row — avg of yearly totals
       const avgYearTotal = WON_FEE_AVG_YEARS.reduce((s, yr) => s + MONTHS.reduce((ms, _, mo) => ms + wfFee[yr][mo], 0), 0) / WON_FEE_AVG_YEARS.length;
-      g += `<div style="background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:5px;padding:0.3rem 0.2rem;
-        text-align:center;cursor:default;min-width:56px;line-height:1.4">
+      const yearlyTotals = WON_FEE_AVG_YEARS.map(yr => MONTHS.reduce((s, _, mo) => s + wfFee[yr][mo], 0)).sort((a, b) => a - b);
+      const ytMid = Math.floor(yearlyTotals.length / 2);
+      const avgTotalMedian = yearlyTotals.length % 2 === 1 ? yearlyTotals[ytMid] : (yearlyTotals[ytMid - 1] + yearlyTotals[ytMid]) / 2;
+      g += `<div title="Median year: ${fmt(avgTotalMedian)}" style="background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:5px;padding:0.3rem 0.2rem;
+        text-align:center;cursor:help;min-width:56px;line-height:1.4">
         <div style="font-size:0.72rem;font-weight:700;color:#374151">${fmt(avgYearTotal)}</div>
         <div style="font-size:0.6rem;color:#94a3b8">avg</div>
       </div>`;
@@ -937,14 +940,25 @@
       [...WON_FEE_YEARS].reverse().forEach(yr => {
         g += `<div style="${labelStyle}">${yr}</div>`;
         let yearTotal = 0, yearCount = 0;
+        const monthlyFees = [];
         MONTHS.forEach((_, mo) => {
           const isFut = yr === 2026 && mo > currentMonth;
           g += wfCell(wfFee[yr][mo], wfCount[yr][mo], isFut, yr, mo);
           if (!isFut) { yearTotal += wfFee[yr][mo]; yearCount += wfCount[yr][mo]; }
+          if (!isFut && wfFee[yr][mo] > 0) monthlyFees.push(wfFee[yr][mo]);
         });
+        // Median of monthly totals for this year
+        const sortedMonthlyFees = [...monthlyFees].sort((a, b) => a - b);
+        const smid = Math.floor(sortedMonthlyFees.length / 2);
+        const medianMonthly = sortedMonthlyFees.length === 0 ? null
+          : sortedMonthlyFees.length % 2 === 1 ? sortedMonthlyFees[smid]
+          : (sortedMonthlyFees[smid - 1] + sortedMonthlyFees[smid]) / 2;
+        const yearTip = medianMonthly !== null
+          ? `title="Median month: ${fmt(medianMonthly)} (${sortedMonthlyFees.length} months)"`
+          : '';
         // Year total cell
-        g += `<div style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:0.3rem 0.2rem;
-          text-align:center;cursor:default;min-width:56px;line-height:1.4">
+        g += `<div ${yearTip} style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:5px;padding:0.3rem 0.2rem;
+          text-align:center;cursor:${medianMonthly !== null ? 'help' : 'default'};min-width:56px;line-height:1.4">
           <div style="font-size:0.72rem;font-weight:700;color:#374151">${yearTotal > 0 ? fmt(yearTotal) : '—'}</div>
           <div style="font-size:0.6rem;color:#94a3b8">${yearCount > 0 ? 'total' : ''}</div>
         </div>`;
